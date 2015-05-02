@@ -13,13 +13,15 @@ var assign = require('lodash').assign;
 // add custom browserify options here
 var customOpts = {
   entries: ['./src/js/app.coffee'],
+  baseDir: './src/js/',
+  extensions: ['.coffee'],
+  paths: ['./src/js/'],
   debug: true
 };
 var opts = assign({}, watchify.args, customOpts);
-var b = watchify(browserify(customOpts)); 
+//var b = watchify(browserify(customOpts)); 
 
-// add transformations here
-// i.e. b.transform(coffeeify);
+var b = browserify(customOpts); 
 
 gulp.task('js', bundle); // so you can run `gulp js` to build the file
 b.on('update', bundle); // on any dep update, runs the bundler
@@ -45,7 +47,9 @@ gulp.task('html', function() {
         .pipe(gulp.dest('dist'))
 });
 
-gulp.task('watch', function() {
+gulp.task('build', ['html', 'js'])
+
+gulp.task('watch', ['build'], function() {
     var bs = browserSync({
         notify: true,
         logPrefix: 'BS',

@@ -1,9 +1,19 @@
 require('es5-shim')
 ROT = require('rot-js')
 Q = require('q')
+_ = require('lodash')
+maps = require('map')
+
+Map = maps.Map
+MapWithObjects = maps.MapWithObjects
 
 Events = require('minivents')
 
+randomItem = (arr) ->
+    return arr[Math.floor(ROT.RNG.getUniform() * arr.length)]
+
+randomDir = () ->
+    return randomItem(ROT.DIRS[8])
 
 class Creature
     constructor: (game, pos) ->
@@ -11,12 +21,29 @@ class Creature
         @x = pos[0]
         @y = pos[1]
         @action = Q.defer()
+        @events = new Events()
 
     canMove: (dir) ->
-        return @game.map.get(@x + dir[0], @y + dir[1])
+        return dir != null && @game.map.get(@x + dir[0], @y + dir[1])
+
+    isEnemy: (other) ->
+        return other != @
+
+    firstEnemyInDir: (dir) ->
+        x = @x + dir[0]
+        y = @y + dir[1]
+
+        return _.find(
+            @game.map.objects.get(x, y),
+            (obj) => @isEnemy(obj)
+        ) || null
 
     move: (dir) ->
+        console.log('move: ' + @constructor.name)
         @action.resolve(() =>
+            if !@canMove(dir)
+                return
+
             oldPos = [@x, @y]
 
             @x += dir[0]
@@ -25,11 +52,23 @@ class Creature
             @game.events.emit('move', @, oldPos)
         )
 
+    attack: (other) ->
+        other.die()
+
+    die: () ->
+        console.log(@constructor.name + ': I died')
+
     act: () ->
+        console.log('act: ' + @constructor.name)
+
+        @events.emit('before-act')
+
         return @action.promise.then(
             (action) => action()
         ).then(() =>
             @action = Q.defer()
+        ).catch((err) =>
+            console.log("Error in action: " + err + "\n" + err.stack)
         )
 
 
@@ -41,7 +80,7 @@ class Player extends Creature
 
 class Monster extends Creature
     draw: (display) ->
-        display.draw(@x,  @y, "g", "#00ff")
+        display.draw(@x,  @y, "g", "#00ff00")
 
 
 keyEventToDir = (e) ->
@@ -70,54 +109,41 @@ class PlayerController
     constructor: (target) ->
         @target = target
 
+        window.addEventListener('keydown',
+            (e) => @handleKeyEvent(e)
+        )
+
     handleKeyEvent: (e) ->
         dir = keyEventToDir(e)
 
-        if dir != null && !@target.canMove(dir)
+        if dir == null
             return
 
-        @target.move(dir)
+        enemy = @target.firstEnemyInDir(dir)
+
+        if enemy?
+            console.log("Found enemy: " + enemy)
+            @target.attack(enemy)
+        else if @target.canMove(dir)
+            @target.move(dir)
 
 
 class MonsterController
     constructor: (target) ->
         @target = target
 
+        @target.events.on('before-act', @think.bind(@))
 
-class Map
-    constructor: () ->
-        @data = {}
+    think: () ->
+        @target.move(randomDir())
 
-    get: (x, y) ->
-        return @data[x+','+y]
 
-    set: (x, y, val) ->
-        @data[x+','+y] = val
-
-    randomLocation: () ->
-        freeCells = Object.keys(@data)
-
-        index = Math.floor(ROT.RNG.getUniform() * freeCells.length)
-        key = freeCells.splice(index, 1)[0]
-        parts = key.split(",")
-        x = parseInt(parts[0])
-        y = parseInt(parts[1])
-
-        return [x, y]
-
-    activeLocations: (cb) ->
-        for key, tile of @data
-            parts = key.split(",")
-            x = parseInt(parts[0])
-            y = parseInt(parts[1])
-
-            cb(x, y, tile)
 
 
 class Game
     constructor: () ->
         @events = new Events()
-        @map = new Map()
+        @map = new MapWithObjects()
         @display = new ROT.Display()
         document.body.appendChild(@display.getContainer())
 
@@ -131,20 +157,25 @@ class Game
         @engine.start()
 
         @player = new Player(@, @map.randomLocation())
-        @playerController = new PlayerController(@player)
+        new PlayerController(@player)
         @addObject(@player)
 
-        window.addEventListener('keydown', 
-            (e) => @playerController.handleKeyEvent(e)
-        )
+        @monster = new Monster(@, @map.randomLocation())
+        new MonsterController(@monster)
+        @addObject(@monster)
 
         @events.on('move', @_handleMove.bind(@))
+        @events.on('move', @map.handleMove.bind(@map))
 
         @engine.start()
 
     addObject: (obj) ->
         @scheduler.add(obj, true)
         obj.draw(@display)
+
+    removeObject: (obj) ->
+        @scheduler.remove(obj)
+        @_drawMapTileAt([obj.x, obj.y])
 
     _handleMove: (obj, oldPos) ->
         @_drawMapTileAt(oldPos)
