@@ -1,0 +1,8 @@
+body.noscroll {
+    overflow: hidden;
+}
+
+body {
+    color: lightgrey;
+    background-color: black;
+}

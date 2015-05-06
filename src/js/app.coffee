@@ -15,13 +15,24 @@ randomItem = (arr) ->
 randomDir = () ->
     return randomItem(ROT.DIRS[8])
 
+attack = (weapon, target, agressor) ->
+    result = weapon.attack(target, agressor)
+
+    if result?
+        target.takeDamage(result)
+
 class Creature
+    maxHp: 1
+    weapon: null
+
     constructor: (game, pos) ->
         @game = game
         @x = pos[0]
         @y = pos[1]
         @action = Q.defer()
         @events = new Events()
+
+        @hp = @maxHp
 
     canMove: (dir) ->
         return dir != null && @game.map.get(@x + dir[0], @y + dir[1])
@@ -39,7 +50,6 @@ class Creature
         ) || null
 
     move: (dir) ->
-        console.log('move: ' + @constructor.name)
         @action.resolve(() =>
             if !@canMove(dir)
                 return
@@ -50,17 +60,32 @@ class Creature
             @y += dir[1]
 
             @game.events.emit('move', @, oldPos)
+            @postMove(oldPos)
         )
 
     attack: (other) ->
-        other.die()
+        @action.resolve(() =>
+            attack(@weapon, other, @)
+        )
+
+    getSightRadius: () ->
+        return 5
+
+    postMove: (oldPos) ->
+
+    takeDamage: (damage) ->
+        @hp -= damage.amount
+
+        @game.events.emit('take-damage', damage)
+
+        if @hp <= 0
+            @die()
 
     die: () ->
-        console.log(@constructor.name + ': I died')
+        @game.removeObject(@)
+        @game.events.emit('die', @)
 
     act: () ->
-        console.log('act: ' + @constructor.name)
-
         @events.emit('before-act')
 
         return @action.promise.then(
@@ -69,13 +94,21 @@ class Creature
             @action = Q.defer()
         ).catch((err) =>
             console.log("Error in action: " + err + "\n" + err.stack)
+            @action = Q.defer()
         )
 
-
+class Sword
+    attack: (target, agressor) ->
+        return amount: 3
 
 class Player extends Creature
+    weapon: new Sword()
+
     draw: (display) ->
         display.draw(@x,  @y, "@", "#ff0")
+
+    postMove: (oldPos) ->
+        @game.updateVisibilityFov(@)
 
 
 class Monster extends Creature
@@ -144,6 +177,9 @@ class Game
     constructor: () ->
         @events = new Events()
         @map = new MapWithObjects()
+        @vizMap = new Map()
+        @exploredMap = new Map()
+
         @display = new ROT.Display()
         document.body.appendChild(@display.getContainer())
 
@@ -159,6 +195,7 @@ class Game
         @player = new Player(@, @map.randomLocation())
         new PlayerController(@player)
         @addObject(@player)
+        @updateVisibilityFov(@player)
 
         @monster = new Monster(@, @map.randomLocation())
         new MonsterController(@monster)
@@ -169,17 +206,46 @@ class Game
 
         @engine.start()
 
+    updateVisibilityFov: (source) ->
+        @display.clear()
+        @vizMap = new Map()
+
+        @_drawWholeMap()
+
+        lightPassesThrough = (x, y) =>
+            return @map.get(x, y)?
+
+        fov = new ROT.FOV.PreciseShadowcasting(lightPassesThrough)
+        radius = source.getSightRadius()
+
+        fov.compute(source.x, source.y, radius, (x ,y) =>
+            @vizMap.set(x, y, true)
+            @exploredMap.set(x, y, true)
+
+            @_drawMapTileAt([x, y])
+
+            objects = @map.objects.get(x, y) || []
+
+            for object in objects
+                do (object) =>
+                    object.draw(@display)
+        )
+
     addObject: (obj) ->
         @scheduler.add(obj, true)
-        obj.draw(@display)
+        @map.addObject(obj)
+        # TODO: Check vis first (may require calculating it)
+        # obj.draw(@display)
 
     removeObject: (obj) ->
         @scheduler.remove(obj)
+        @map.removeObject(obj)
         @_drawMapTileAt([obj.x, obj.y])
 
     _handleMove: (obj, oldPos) ->
-        @_drawMapTileAt(oldPos)
-        obj.draw(@display)
+        if @vizMap.get(obj.x, obj.y)
+            @_drawMapTileAt(oldPos)
+            obj.draw(@display)
 
     _generateMap: () ->
         digger = new ROT.Map.Digger()
@@ -192,9 +258,18 @@ class Game
 
     _drawMapTileAt: (pos) ->
         tile = @map.get(pos[0], pos[1])
-        @display.draw(pos[0], pos[1], tile)
+
+        x = pos[0]
+        y = pos[1]
+
+        if @vizMap.get(x, y)
+            @display.draw(x, y, tile)
+        else if @exploredMap.get(x, y)
+            @display.draw(x, y, tile, '#333333')
 
     _drawWholeMap: () ->
-        @map.activeLocations(@display.draw.bind(@display))
+        @map.activeLocations((x, y, tile) =>
+            @_drawMapTileAt([x, y])
+        )
 
 (new Game())

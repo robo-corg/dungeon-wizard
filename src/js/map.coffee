@@ -27,7 +27,6 @@ class Map
             parts = key.split(",")
             x = parseInt(parts[0])
             y = parseInt(parts[1])
-
             cb(x, y, tile)
 
 

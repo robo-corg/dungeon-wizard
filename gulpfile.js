@@ -47,7 +47,13 @@ gulp.task('html', function() {
         .pipe(gulp.dest('dist'))
 });
 
-gulp.task('build', ['html', 'js'])
+// CSS
+gulp.task('css', function() {
+    return gulp.src('src/*.css')
+        .pipe(gulp.dest('dist'))
+});
+
+gulp.task('build', ['html', 'css', 'js'])
 
 gulp.task('watch', ['build'], function() {
     var bs = browserSync({
@@ -60,12 +66,15 @@ gulp.task('watch', ['build'], function() {
         server: ['dist', 'src']
     });
 
-    //bs.notify("HTML <span color='green'>is supported</span> too!");
+    gulp.on('stop', function () {
+        bs.reload();
+    })
 
-    gulp.watch('./src/js/*.coffee', ['js']).on('change', function() {
-        bs.reload("*.js");
-    });
+    gulp.watch('./src/js/*.coffee', ['js'])
 
     // Watch .html files
     gulp.watch('src/*.html', ['html']);
+
+    // Watch .css files
+    gulp.watch('src/*.css', ['css']);
 });
