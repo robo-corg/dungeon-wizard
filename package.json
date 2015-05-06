@@ -1,5 +1,5 @@
 {
-  "name": "airlock",
+  "name": "dungeon-wizard",
   "version": "0.0.1",
   "description": "",
   "main": "index.js",
@@ -22,10 +22,6 @@
     "gulp-load-plugins": "^0.10.0",
     "gulp-sourcemaps": "^1.5.2",
     "gulp-util": "^3.0.4",
-    "jasmine": "^2.3.0",
-    "karma-coffee-preprocessor": "^0.2.1",
-    "karma-mocha": "^0.1.10",
-    "karma-requirejs": "^0.2.2",
     "mocha": "^2.2.4",
     "requirejs": "^2.1.17",
     "vinyl-buffer": "^1.0.0",
