@@ -10,8 +10,10 @@ you would like to try it out.
 
 ## Building
 
+```
 npm install
 gulp build
+```
 
 ## Todo
 
