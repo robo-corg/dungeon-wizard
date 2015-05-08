@@ -62,4 +62,7 @@ class MapWithObjects extends Map
         @_remove(oldPos[0], oldPos[1], obj)
         @addObject(obj)
 
-module.exports = {Map: Map, MapWithObjects: MapWithObjects}
+module.exports = {
+    Map,
+    MapWithObjects
+}
