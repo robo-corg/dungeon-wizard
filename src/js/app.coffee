@@ -6,39 +6,25 @@ _ = require('lodash')
 
 Events = require('events').EventEmitter
 
-
-class Game
-    constructor: () ->
-        @events = new Events()
+class Scene
+    constructor: (game) ->
+        @game = game
+        @display = game.display
         @map = new MapWithObjects()
         @vizMap = new Map()
         @exploredMap = new Map()
 
-        @display = new ROT.Display()
-        document.body.appendChild(@display.getContainer())
+        @game.events.on('move', @_handleMove.bind(@))
+        @game.events.on('move', @map.handleMove.bind(@map))
 
-        @_generateMap()
-        @_drawWholeMap()
+    addObject: (obj) ->
+        @map.addObject(obj)
+        # TODO: Check vis first (may require calculating it)
+        # obj.draw(@display)
 
-        @scheduler = new ROT.Scheduler.Simple()
-        @scheduler.add(this.player, true)
-
-        @engine = new ROT.Engine(@scheduler)
-        @engine.start()
-
-        @player = new Player(@, @map.randomLocation(@passable.bind(@)))
-        new PlayerController(@player)
-        @addObject(@player)
-        @updateVisibilityFov(@player)
-
-        @monster = new Monster(@, @map.randomLocation(@passable.bind(@)))
-        new MonsterController(@monster)
-        @addObject(@monster)
-
-        @events.on('move', @_handleMove.bind(@))
-        @events.on('move', @map.handleMove.bind(@map))
-
-        @engine.start()
+    removeObject: (obj) ->
+        @map.removeObject(obj)
+        @_drawMapTileAt([obj.x, obj.y])
 
     lightPassesThroughTile: (tile) ->
         return tile? && tile == '.'
@@ -53,7 +39,7 @@ class Game
         @display.clear()
         @vizMap = new Map()
 
-        @_drawWholeMap()
+        @drawWholeMap()
 
         lightPassesThrough = (x, y) =>
             return @lightPassesThroughTile(@map.get(x, y))
@@ -74,23 +60,7 @@ class Game
                     object.draw(@display)
         )
 
-    addObject: (obj) ->
-        @scheduler.add(obj, true)
-        @map.addObject(obj)
-        # TODO: Check vis first (may require calculating it)
-        # obj.draw(@display)
-
-    removeObject: (obj) ->
-        @scheduler.remove(obj)
-        @map.removeObject(obj)
-        @_drawMapTileAt([obj.x, obj.y])
-
-    _handleMove: (obj, oldPos) ->
-        if @vizMap.get(obj.x, obj.y)
-            @_drawMapTileAt(oldPos)
-            obj.draw(@display)
-
-    _generateMap: () ->
+    generateMap: () ->
         digger = new ROT.Map.Digger()
         digCallback = (x, y, value) ->
             if value
@@ -119,9 +89,57 @@ class Game
         else if @exploredMap.get(x, y)
             @display.draw(x, y, tile, '#333333')
 
-    _drawWholeMap: () ->
+    drawWholeMap: () ->
         @map.activeLocations((x, y, tile) =>
             @_drawMapTileAt([x, y])
         )
+
+    _handleMove: (obj, oldPos) ->
+        if @vizMap.get(obj.x, obj.y)
+            @_drawMapTileAt(oldPos)
+            obj.draw(@display)
+
+    randomSpawnLocation: () ->
+        return @map.randomLocation(@passable.bind(@))
+
+class Game
+    constructor: () ->
+        @events = new Events()
+
+        @display = new ROT.Display()
+        document.body.appendChild(@display.getContainer())
+
+        @scene = new Scene(@)
+        @scene.generateMap()
+        @scene.drawWholeMap()
+
+        @scheduler = new ROT.Scheduler.Simple()
+        @scheduler.add(this.player, true)
+
+        @engine = new ROT.Engine(@scheduler)
+        @engine.start()
+
+        @player = new Player(@, @scene.randomSpawnLocation())
+        new PlayerController(@player)
+        @addObject(@player)
+        @scene.updateVisibilityFov(@player)
+
+        @monster = new Monster(@, @scene.randomSpawnLocation())
+        new MonsterController(@monster)
+        @addObject(@monster)
+
+
+        @engine.start()
+
+
+    addObject: (obj) ->
+        @scheduler.add(obj, true)
+        @scene.addObject(obj)
+
+    removeObject: (obj) ->
+        @scheduler.remove(obj)
+        @scene.removeObject(obj)
+
+
 
 (new Game())

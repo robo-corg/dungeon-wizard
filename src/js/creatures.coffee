@@ -29,7 +29,7 @@ class Creature
         return tile? && tile == '.'
 
     canMove: (dir) ->
-        return dir != null && @passable(@game.map.get(@x + dir[0], @y + dir[1]))
+        return dir != null && @passable(@game.scene.map.get(@x + dir[0], @y + dir[1]))
 
     isEnemy: (other) ->
         return other != @
@@ -39,7 +39,7 @@ class Creature
         y = @y + dir[1]
 
         return _.find(
-            @game.map.objects.get(x, y),
+            @game.scene.map.objects.get(x, y),
             (obj) => @isEnemy(obj)
         ) || null
 
@@ -101,7 +101,7 @@ class Player extends Creature
         display.draw(@x,  @y, "@", "#ff0")
 
     postMove: (oldPos) ->
-        @game.updateVisibilityFov(@)
+        @game.scene.updateVisibilityFov(@)
 
 
 class Monster extends Creature
