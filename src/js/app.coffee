@@ -26,12 +26,12 @@ class Game
         @engine = new ROT.Engine(@scheduler)
         @engine.start()
 
-        @player = new Player(@, @map.randomLocation())
+        @player = new Player(@, @map.randomLocation(@passable.bind(@)))
         new PlayerController(@player)
         @addObject(@player)
         @updateVisibilityFov(@player)
 
-        @monster = new Monster(@, @map.randomLocation())
+        @monster = new Monster(@, @map.randomLocation(@passable.bind(@)))
         new MonsterController(@monster)
         @addObject(@monster)
 
@@ -40,6 +40,15 @@ class Game
 
         @engine.start()
 
+    lightPassesThroughTile: (tile) ->
+        return tile? && tile == '.'
+
+    passable: (tile) ->
+        return tile? && tile == '.'
+
+    impassible: (tile) ->
+        return !@passable(tile)
+
     updateVisibilityFov: (source) ->
         @display.clear()
         @vizMap = new Map()
@@ -47,7 +56,7 @@ class Game
         @_drawWholeMap()
 
         lightPassesThrough = (x, y) =>
-            return @map.get(x, y)?
+            return @lightPassesThroughTile(@map.get(x, y))
 
         fov = new ROT.FOV.PreciseShadowcasting(lightPassesThrough)
         radius = source.getSightRadius()
@@ -89,6 +98,15 @@ class Game
             @map.set(x, y, '.')
 
         digger.create(digCallback.bind(@))
+
+        @map.activeLocations((x, y, tile) =>
+            for dir in ROT.DIRS[8]
+                wx = x + dir[0]
+                wy = y + dir[1]
+
+                if !@map.get(wx, wy)?
+                    @map.set(wx, wy, '#')
+        )
 
     _drawMapTileAt: (pos) ->
         tile = @map.get(pos[0], pos[1])

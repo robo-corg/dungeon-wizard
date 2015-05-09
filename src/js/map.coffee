@@ -1,6 +1,13 @@
 ROT = require('rot-js')
 _ = require('lodash')
 
+keyToPos = (key) ->
+    parts = key.split(",")
+    x = parseInt(parts[0])
+    y = parseInt(parts[1])
+
+    return [x, y]
+
 class Map
     constructor: () ->
         @data = {}
@@ -11,16 +18,24 @@ class Map
     set: (x, y, val) ->
         @data[x+','+y] = val
 
-    randomLocation: () ->
+    randomLocation: (filt) ->
         freeCells = Object.keys(@data)
 
-        index = Math.floor(ROT.RNG.getUniform() * freeCells.length)
-        key = freeCells.splice(index, 1)[0]
-        parts = key.split(",")
-        x = parseInt(parts[0])
-        y = parseInt(parts[1])
+        lookupFilt = (key) =>
+            pos = keyToPos(key)
+            return filt(@get(pos[0], pos[1]))
 
-        return [x, y]
+        if filt?
+            freeCells = _.filter(freeCells, lookupFilt)
+
+        index = Math.floor(ROT.RNG.getUniform() * freeCells.length)
+
+        key = freeCells.splice(index, 1)[0]
+
+        if !key?
+            return null
+
+        return keyToPos(key)
 
     activeLocations: (cb) ->
         for key, tile of @data

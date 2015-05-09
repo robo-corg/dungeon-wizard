@@ -25,8 +25,11 @@ class Creature
 
         @hp = @maxHp
 
+    passable: (tile) ->
+        return tile? && tile == '.'
+
     canMove: (dir) ->
-        return dir != null && @game.map.get(@x + dir[0], @y + dir[1])
+        return dir != null && @passable(@game.map.get(@x + dir[0], @y + dir[1]))
 
     isEnemy: (other) ->
         return other != @
